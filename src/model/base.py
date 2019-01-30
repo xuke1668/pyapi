@@ -4,8 +4,9 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 """
+from hmac import compare_digest
+
 from werkzeug.security import generate_password_hash, check_password_hash
-from itsdangerous import constant_time_compare
 
 from .. import db
 from ..tool import get_age
@@ -41,7 +42,7 @@ class AdminUser(db.Model):
 
     def check_password(self, password, is_hash=False):
         if is_hash:
-            return constant_time_compare(self.password, password)
+            return compare_digest(self.password, password)
         return check_password_hash(self.password, password)
 
 

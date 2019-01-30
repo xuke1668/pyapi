@@ -6,9 +6,10 @@
 """
 import time
 from functools import wraps
+from hmac import compare_digest
 
 from flask import current_app, g, request
-from itsdangerous import URLSafeSerializer, constant_time_compare
+from itsdangerous import URLSafeSerializer
 
 from . import cache
 from .tool import get_client_ident
@@ -74,13 +75,13 @@ def need_token(func):
 
         # 判断token环境是否改变
         identifier = get_client_ident(g.get("client_info"))
-        if not constant_time_compare(str(user_ident), str(identifier)):
+        if not compare_digest(str(user_ident), str(identifier)):
             raise TokenErr("TOKEN_CHANGED", "登录环境改变", user_id=user_id)
 
         # 判断token缓存是否有效
         cached_token = cache.get("{0}{1}".format(TOKEN_PREFIX, user_id))
         if cached_token:
-            if not constant_time_compare(cached_token, token):  # token不同时，把cached_token解析出来比对哪里有变化，以便给出精准提示
+            if not compare_digest(cached_token, token):  # token不同时，把cached_token解析出来比对哪里有变化，以便给出精准提示
                 try:
                     _user_id, _password, _user_ident, _token_lifetime, _create_time = token_serializer.loads(cached_token)
                 except Exception:
