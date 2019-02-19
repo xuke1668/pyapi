@@ -14,7 +14,7 @@ import hashlib
 import uuid
 import time
 import traceback
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 from hashlib import sha512
 from random import choice
@@ -134,10 +134,10 @@ def get_error_info():
     return error_field[0] if error_field else ("", "", "", "")
 
 
-def get_datetime(now=None, month=0, week=0, day=0, hour=0, minute=0, second=0):
+def get_datetime(now=None, years=0, month=0, week=0, day=0, hour=0, minute=0, second=0):
     if now is None:
         now = datetime.now()
-    res = now + relativedelta(months=month) + timedelta(weeks=week) + timedelta(days=day) + timedelta(hours=hour) + timedelta(minutes=minute) + timedelta(seconds=second)
+    res = now + relativedelta(years=years, months=month, weeks=week, days=day, hours=hour, minutes=minute, seconds=second)
     return res
 
 
