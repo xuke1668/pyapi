@@ -48,14 +48,16 @@ def register_api_doc():
     if current_app.config.get("ENV") == "development":
         from ..doc import generate_doc
         view_functions = [(k, v) for k, v in current_app.view_functions.items() if k.startswith(api.name+".")]
-        api_doc = partial(generate_doc, view_functions=view_functions, common_param_list=COMMON_PARAM_LIST, response_code_list=RESPONSE_CODE_LIST)
-        current_app.add_url_rule(api.url_prefix + "/doc/", view_func=api_doc, endpoint='api_doc', methods=["GET"])
+        api_doc_func = partial(generate_doc, view_functions=view_functions, common_param_list=COMMON_PARAM_LIST, response_code_list=RESPONSE_CODE_LIST)
+        api_doc_endpoint = api.name + "_api_doc"
+        api_doc_url = api.url_prefix + "/doc/"
+        current_app.add_url_rule(api_doc_url, view_func=api_doc_func, endpoint=api_doc_endpoint, methods=["GET"])
         # 由于请求分发（full_dispatch_request）之前request的内容就已经通过request_context装载完毕，那时候url_map中还没有文档接口。
         # 如果恰好第一个request就要请求文档接口，会导致request_context装载时match_request失败，产生404错误，然后调用请求分发时会弹出这个错误。
         # 这里在匹配到请求文档接口的意图后，手动修改request请求体，把错误去除后再把url_rule装载到请求体里，就可以了。
-        if request.path == api.url_prefix + "/doc/" and request.method.upper() == "GET":
+        if request.path == api_doc_url and request.method.upper() == "GET":
             request.routing_exception = None
-            request.url_rule = current_app.url_map._rules_by_endpoint['api_doc'][0]
+            request.url_rule = current_app.url_map._rules_by_endpoint[api_doc_endpoint][0]
             request.view_args = {}
 
 

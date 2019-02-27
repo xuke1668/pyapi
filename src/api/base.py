@@ -8,7 +8,6 @@ import re
 from datetime import datetime
 
 from flask import g, current_app, request
-from werkzeug.security import generate_password_hash
 
 from .. import db
 from ..tool import is_mobile, is_password, is_sms_code, is_date, get_datetime, create_random_num, create_uuid_str, datediff
@@ -412,7 +411,7 @@ def update_password():
     #desc   修改用户密码
     #priv   need_login
     #param  old_password    <str>    旧密码
-    #param  password    <str>        新密码
+    #param  new_password    <str>        新密码
     #example
     {
         "code": 0,
@@ -421,13 +420,13 @@ def update_password():
     }
     """
     old_password = str(g.request_data.get("old_password", "")).strip()
-    password = str(g.request_data.get("password", "")).strip()
+    new_password = str(g.request_data.get("new_password", "")).strip()
 
-    if old_password == password:
+    if old_password == new_password:
         current_app.logger.debug("新密码不能与旧密码相同: account:%s", g.user.account)
         return api_return("PARAM_ERROR", "新密码不能与旧密码相同")
 
-    if not is_password(old_password) or not is_password(password):
+    if not is_password(old_password) or not is_password(new_password):
         current_app.logger.debug("密码参数错误: account:%s", g.user.account)
         return api_return("PARAM_ERROR", "密码参数错误")
 
@@ -435,7 +434,7 @@ def update_password():
         current_app.logger.debug("旧密码错误: account:%s", g.user.account)
         return api_return("USER_PWD_ERROR", "旧密码错误")
 
-    g.user.password = generate_password_hash(password)
+    g.user.password = new_password
     try:
         db.session.commit()
         logout_user()
@@ -639,7 +638,7 @@ def reset_password():
         return api_return("PARAM_CODE_INVALID", "验证码已过期")
 
     code.status = 1  # 修改验证码状态为已使用
-    user.password = generate_password_hash(password)
+    user.password = password
     try:
         db.session.commit()
     except Exception as e:
