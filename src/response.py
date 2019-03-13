@@ -7,7 +7,7 @@
 
 import json
 import decimal
-from datetime import date, datetime
+from datetime import date, time, datetime
 
 from flask import Response
 
@@ -79,6 +79,8 @@ class JsonEncoder(json.JSONEncoder):
             return obj.strftime("%Y-%m-%d %H:%M:%S")
         elif isinstance(obj, date):
             return obj.strftime("%Y-%m-%d")
+        elif isinstance(obj, time):
+            return obj.strftime('%H:%M:%S')
         elif isinstance(obj, decimal.Decimal):
             return float(obj)
         else:
