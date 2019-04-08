@@ -194,9 +194,6 @@ def login():
     #return birthday    <str>   用户生日
     #return age <int>   用户年龄
     #return token   <str>   登录token
-    #return shop_list <object-list> 关联的店铺信息列表
-    #return shop_list[].shop_id <int>   店铺ID
-    #return shop_list[].shop_name   <str>   店铺名称
     #example
     {
         "code": 0,
@@ -209,13 +206,7 @@ def login():
             "sex": 1,
             "birthday": "1990-09-09",
             "age": 0,
-            "token": "tXsfaN60",
-            "shop_list": [
-                {
-                    "shop_id": 1,
-                    "shop_name": "健野科技自营健身馆"
-                }
-            ]
+            "token": "tXsfaN60"
         }
     }
     """
