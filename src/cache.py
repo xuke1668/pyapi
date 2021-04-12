@@ -7,7 +7,7 @@
 import json
 from time import time
 
-from werkzeug.contrib.cache import SimpleCache
+from cachelib import SimpleCache
 
 try:
     import redis

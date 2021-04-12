@@ -23,7 +23,7 @@ function Start(){
         echo "uwsgi-${app} is running![$pid]"
         return
     else
-        ${UWSGI} --uid ${USER} -s ${host}:${port} --gevent 1000 -M -t 30 --pidfile ${pidfile} --chdir ${cur_dir} -w myapp:flask_app -d ${logfile} --logformat '"%(ltime)" "%(addr)" "%(uagent)" "%(method) %(uri)" %(status) %(rsize)B %(msecs)ms'
+        ${UWSGI} --uid ${USER} -s ${host}:${port} --gevent 1000 -M -t 30 --pidfile ${pidfile} --chdir ${cur_dir} -w myapp:flask_app -d ${logfile} --logformat ${UWSGI_LOG_FORMAT}
     fi
     sleep 1
     pid=`get_pid`
@@ -75,6 +75,7 @@ function Reload(){
 
 cur_dir="$(cd `dirname "$0"` && pwd)"
 UWSGI='/data/apps/py36_flask/bin/uwsgi'
+UWSGI_LOG_FORMAT='"%(ltime)" "%(addr)" "%(uagent)" "%(method) %(uri)" %(cl)B %(status) %(rsize)B %(msecs)ms'
 USER='uwsgi'
 
 app='web'
