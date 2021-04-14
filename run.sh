@@ -23,7 +23,7 @@ function Start(){
         echo "uwsgi-${app} is running![$pid]"
         return
     else
-        ${UWSGI} --uid ${USER} -s ${host}:${port} --gevent 1000 -M -t 30 --pidfile ${pidfile} --chdir ${cur_dir} -w myapp:flask_app -d ${logfile} --logformat ${UWSGI_LOG_FORMAT}
+        ${UWSGI} --uid ${USER} -s ${host}:${port} --gevent 1000 -M -t 30 --pidfile ${pidfile} --chdir ${cur_dir} -w myapp:flask_app -d ${logfile} --logformat "${UWSGI_LOG_FORMAT}"
     fi
     sleep 1
     pid=`get_pid`
