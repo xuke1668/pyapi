@@ -15,12 +15,8 @@ from . import cache
 from .tool import get_client_ident
 
 
-# token名称
-TOKEN_NAME = "token"
 # token缓存前缀
 TOKEN_PREFIX = "user_token_"
-# token缓存时间
-TOKEN_LIFETIME = 7 * 24 * 60 * 60
 
 
 class TokenErr(Exception):
@@ -40,8 +36,8 @@ def create_token(user_id, password, client_info=""):
     """
     create_time = int(time.time())
     user_ident = get_client_ident(client_info)
-    token_lifetime = current_app.config.get("TOKEN_LIFETIME", TOKEN_LIFETIME)
-    key = current_app.config.get("SECRET_KEY", '')
+    token_lifetime = current_app.config.get("TOKEN_LIFETIME", 3 * 24 * 60 * 60)
+    key = current_app.config.get("SECRET_KEY", "")
     token_serializer = URLSafeSerializer(key)
     token = token_serializer.dumps((user_id, password, user_ident, token_lifetime, create_time))
     cache.set("{0}{1}".format(TOKEN_PREFIX, user_id), token, timeout=token_lifetime)
@@ -60,7 +56,7 @@ def need_token(func):
     """校验token合法性"""
     @wraps(func)
     def wrapper(*args, **kwargs):
-        token_id = current_app.config.get("TOKEN_NAME", TOKEN_NAME)
+        token_id = current_app.config.get("TOKEN_NAME", "token")
         token = request.headers.get(token_id) or g.request_data.get(token_id)
         if token is None:
             raise TokenErr("TOKEN_NOT_FOUND", "缺少登录凭证")

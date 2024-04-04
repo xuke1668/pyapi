@@ -9,15 +9,6 @@ from time import time
 
 from cachelib import SimpleCache
 
-try:
-    import redis
-except ImportError:
-    raise RuntimeError('Redis module not found')
-
-
-def dump_object(value):
-    return json.dumps(value)
-
 
 def load_object(value):
     if value is None:
@@ -28,17 +19,44 @@ def load_object(value):
         return None
 
 
+class Cache:
+    def __init__(self, app=None, cache_type="", **kwargs):
+        self.cache_type = cache_type
+        if app is not None:
+            self.init_app(app, self.cache_type, **kwargs)
+
+    def init_app(self, app, cache_type="", **kwargs):
+        if cache_type:
+            self.cache_type = cache_type
+        if not self.cache_type:
+            self.cache_type = "memory"
+
+        self.set_cache_type(app, self.cache_type, **kwargs)
+
+    def set_cache_type(self, app, cache_type="", **kwargs):
+        if cache_type.lower() in ("mem", "memory"):
+            self.__class__ = MemCache
+        elif cache_type.lower() in ("red", "redis"):
+            self.__class__ = RedisCache
+        else:
+            raise ValueError("指定的缓存类型错误")
+        self.__init__(app, **kwargs)
+
+    def get(self, *arg, **kwargs):
+        pass
+
+
 class MemCache(SimpleCache):
     """内存缓存"""
-    def __init__(self, app=None, key_prefix='', key_timeout=None, threshold=500):
+    def __init__(self, app=None, key_prefix="", key_timeout=None, threshold=1000):
         super().__init__(threshold)
-        self.key_prefix = ''
+        self.key_prefix = ""
         self.key_timeout = 0
         self.app = app
         if app is not None:
             self.init_app(app, key_prefix, key_timeout, threshold)
 
-    def init_app(self, app, key_prefix='', key_timeout=None, threshold=5000):
+    def init_app(self, app, key_prefix="", key_timeout=None, threshold=1000):
         self._threshold = threshold
         self.key_prefix = key_prefix if key_prefix else app.config.get("MEM_CACHE_KEY_PREFIX", self.key_prefix)
         self.key_timeout = key_timeout if key_timeout else app.config.get("MEM_CACHE_KEY_TIMEOUT", self.key_timeout)
@@ -68,14 +86,14 @@ class MemCache(SimpleCache):
 
     def set(self, key, value, key_prefix=True, timeout=None):
         self._prune()
-        self._cache[self._key(key, key_prefix)] = (self._normalize_timeout(timeout), dump_object(value))
+        self._cache[self._key(key, key_prefix)] = (self._normalize_timeout(timeout), json.dumps(value))
         return True
 
     def add(self, key, value, key_prefix=True, timeout=None):
         self._prune()
         if key in self._cache:
             return False
-        item = (self._normalize_timeout(timeout), dump_object(value))
+        item = (self._normalize_timeout(timeout), json.dumps(value))
         self._cache.setdefault(self._key(key, key_prefix), item)
         return True
 
@@ -90,21 +108,26 @@ class MemCache(SimpleCache):
         return expires == 0 or expires > time()
 
 
-class RedisCache(object):
+class RedisCache:
     """redis缓存"""
-    def __init__(self, app=None, redis_uri='', key_prefix='', key_timeout=None, **kwargs):
+    def __init__(self, app=None, redis_uri="", key_prefix="", key_timeout=None, **kwargs):
         self.redis_uri = 'redis://localhost:6379/0'
         self._client = None
-        self.key_prefix = ''
+        self.key_prefix = ""
         self.key_timeout = -1
         self.app = app
         if app is not None:
             self.init_app(app, redis_uri, key_prefix, key_timeout, **kwargs)
 
-    def init_app(self, app, redis_uri='', key_prefix='', key_timeout=None, **kwargs):
+    def init_app(self, app, redis_uri="", key_prefix="", key_timeout=None, **kwargs):
         self.redis_uri = redis_uri if redis_uri else app.config.get("REDIS_URI", self.redis_uri)
-        self.key_prefix = key_prefix if key_prefix else app.config.get("REDIS_KEY_PREFIX", self.key_prefix)
+        self.key_prefix = key_prefix if key_prefix else app.name + "_"
         self.key_timeout = key_timeout if key_timeout else app.config.get("REDIS_KEY_TIMEOUT", self.key_timeout)
+
+        try:
+            import redis
+        except ImportError:
+            raise RuntimeError("Redis module not found")
         self._client = redis.StrictRedis.from_url(self.redis_uri, **kwargs)
 
     def _normalize_timeout(self, timeout):
@@ -133,7 +156,7 @@ class RedisCache(object):
     def set(self, key, value, timeout=None, key_prefix=True):
         key = self._key(key, key_prefix)
         timeout = self._normalize_timeout(timeout)
-        value = dump_object(value)
+        value = json.dumps(value)
         if timeout == -1:
             result = self._client.set(name=key, value=value)
         else:
@@ -143,7 +166,7 @@ class RedisCache(object):
     def add(self, key, value, timeout=None, key_prefix=True):
         key = self._key(key, key_prefix)
         timeout = self._normalize_timeout(timeout)
-        value = dump_object(value)
+        value = json.dumps(value)
         return (
             self._client.setnx(name=key, value=value) and
             self._client.expire(name=key, time=timeout)
@@ -154,7 +177,7 @@ class RedisCache(object):
         pipe = self._client.pipeline(transaction=transaction)
         for key, value in mapping:
             key = self._key(key, key_prefix)
-            value = dump_object(value)
+            value = json.dumps(value)
             if timeout == -1:
                 pipe.set(name=key, value=value)
             else:

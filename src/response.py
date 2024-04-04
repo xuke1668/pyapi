@@ -12,7 +12,21 @@ from datetime import date, time, datetime
 from flask import Response
 
 
-RESPONSE_CODE_LIST = {
+GLOBAL_REQUEST_PARAM_LIST = {}
+GLOBAL_RESPONSE_CODE_LIST = {
+    "200": (0, "成功"),
+    "400": (400, "请求异常"),
+    "401": (401, "需要验证身份"),
+    "403": (403, "禁止访问"),
+    "404": (404, "接口不存在"),
+    "405": (405, "方法不支持"),
+    "413": (413, "提交数据过大"),
+    "414": (414, "请求地址过长"),
+    "500": (500, "服务器异常"),
+    "502": (502, "网关异常"),
+    "503": (503, "服务不可用"),
+    "504": (504, "网关超时"),
+
     "ERR": (-1, "未知错误"),
 
     "OK": (0, "成功"),
@@ -24,12 +38,6 @@ RESPONSE_CODE_LIST = {
     "SQL_ERROR": (11, "SQL错误"),
 
     "SMS_SEND_FAILED": (20, "短信发送失败"),
-
-    "CODE400": (400, "请求异常"),
-    "CODE403": (403, "无访问权限"),
-    "CODE404": (404, "接口不存在"),
-    "CODE405": (405, "方法不支持"),
-    "CODE500": (500, "服务端异常"),
 
     "REQUEST_NUMBER_LIMIT": (1000, "请求次数超出限制"),
     "REQUEST_INTERVAL_LIMIT": (1001, "请求频率超出限制"),
@@ -52,24 +60,6 @@ RESPONSE_CODE_LIST = {
     "DATA_NOT_CHANGE": (2002, "数据未改变"),
     "DATA_ERROR": (2003, "数据错误"),
 
-    "TOKEN_NOT_FOUND": (2100, "缺少登录凭证"),
-    "TOKEN_ERROR": (2101, "非法的登录凭证"),
-    "TOKEN_INVALID": (2102, "登录凭证已失效"),
-    "TOKEN_CHANGED": (2103, "登录环境改变"),
-    "TOKEN_EXPIRED": (2104, "登录凭证已过期"),
-    "TOKEN_TYPE_ERROR": (2105, "登录凭证类型错误"),
-    "TOKEN_USER_ERROR": (2106, "无效的用户"),
-    "TOKEN_USER_INVALID": (2107, "账号已禁用"),
-    "TOKEN_PWD_ERROR": (2108, "密码已被改变"),
-
-    "USER_NOT_LOGIN": (2200, "用户未登录"),
-    "USER_NOT_FOUND": (2201, "用户不存在"),
-    "USER_INVALID": (2202, "无效的用户"),
-    "USER_TYPE_ERROR": (2203, "用户类型错误"),
-    "USER_PWD_ERROR": (2204, "用户密码错误"),
-    "USER_PRIV_ERROR": (2205, "用户权限不足"),
-    "USER_EXIST": (2206, "用户已存在"),
-
 }
 
 
@@ -84,22 +74,8 @@ class JsonEncoder(json.JSONEncoder):
         elif isinstance(obj, decimal.Decimal):
             return float(obj)
         else:
-            return super().default(self, obj)
+            return super().default(obj)
 
 
 def json_return(data):
     return Response(json.dumps(data, cls=JsonEncoder, separators=(",", ":")), mimetype="application/json")
-
-
-def api_return(code, msg=None, data=None, **kwargs):
-    code = str(code).upper()
-    if code not in RESPONSE_CODE_LIST.keys():
-        code = "ERR"
-    if msg is None:
-        msg = RESPONSE_CODE_LIST[code][1]
-    if data is None:
-        data = ""
-
-    result = {"code": RESPONSE_CODE_LIST[code][0], "msg": msg, "data": data}
-    result.update(kwargs)
-    return json_return(result)

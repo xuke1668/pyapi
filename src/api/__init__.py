@@ -5,11 +5,12 @@
 
 """
 import re
-from functools import partial, wraps
+from functools import wraps
 
-from flask import Blueprint, current_app, g, request
+from flask import Blueprint, current_app, g
+from werkzeug.exceptions import HTTPException
 
-from ..response import api_return, RESPONSE_CODE_LIST
+from ..response import json_return, GLOBAL_REQUEST_PARAM_LIST, GLOBAL_RESPONSE_CODE_LIST
 from ..tool import get_error_info
 from ..auth import TokenErr, need_token, create_token, clear_token
 from ..model.base import AdminUser as UserInfo
@@ -18,57 +19,77 @@ from ..model.base import AdminUser as UserInfo
 api = Blueprint("api", __name__, url_prefix="/api")
 
 # 公共参数列表
-COMMON_PARAM_LIST = [
-        {"name": "app_channel", "type": "str", "desc": "APP渠道", "reg": r"\w+", "required": True},
-        {"name": "app_version", "type": "str", "desc": "APP版本", "reg": r"\w+", "required": False},
-        {"name": "os_type", "type": "str", "desc": "系统类型", "reg": r"\w+", "required": False},
-        {"name": "os_version", "type": "str", "desc": "系统版本", "reg": r"\w+", "required": False},
-        {"name": "device_uuid", "type": "str", "desc": "设备唯一标识", "reg": r"\w+", "required": False},
-    ]
+api.COMMON_REQUEST_PARAM_LIST = GLOBAL_REQUEST_PARAM_LIST
+api.COMMON_REQUEST_PARAM_LIST.update({
+        "app_channel": {"type": "str", "desc": "APP渠道", "reg": r"\w+", "required": True},
+        "app_version": {"type": "str", "desc": "APP版本", "reg": r"\w+", "required": False},
+        "os_type": {"type": "str", "desc": "系统类型", "reg": r"\w+", "required": False},
+        "os_version": {"type": "str", "desc": "系统版本", "reg": r"\w+", "required": False},
+        "device_uuid": {"type": "str", "desc": "设备唯一标识", "reg": r"\w+", "required": False},
+})
+# 公共返回值列表
+api.COMMON_RESPONSE_CODE_LIST = GLOBAL_RESPONSE_CODE_LIST
+api.COMMON_RESPONSE_CODE_LIST.update({
+    "TOKEN_NOT_FOUND": (2100, "缺少登录凭证"),
+    "TOKEN_ERROR": (2101, "非法的登录凭证"),
+    "TOKEN_INVALID": (2102, "登录凭证已失效"),
+    "TOKEN_CHANGED": (2103, "登录环境改变"),
+    "TOKEN_EXPIRED": (2104, "登录凭证已过期"),
+    "TOKEN_TYPE_ERROR": (2105, "登录凭证类型错误"),
+    "TOKEN_USER_ERROR": (2106, "无效的用户"),
+    "TOKEN_USER_INVALID": (2107, "账号已禁用"),
+    "TOKEN_PWD_ERROR": (2108, "密码已被改变"),
+
+    "USER_NOT_LOGIN": (2200, "用户未登录"),
+    "USER_NOT_FOUND": (2201, "用户不存在"),
+    "USER_INVALID": (2202, "无效的用户"),
+    "USER_TYPE_ERROR": (2203, "用户类型错误"),
+    "USER_PWD_ERROR": (2204, "用户密码错误"),
+    "USER_PRIV_ERROR": (2205, "用户权限不足"),
+    "USER_EXIST": (2206, "用户已存在"),
+})
+
+
+def api_return(code, msg=None, data=None, **kwargs):
+    code = str(code).upper()
+    if code not in api.COMMON_RESPONSE_CODE_LIST.keys():
+        code = "ERR"
+    if msg is None:
+        msg = api.COMMON_RESPONSE_CODE_LIST[code][1]
+    if data is None:
+        data = ""
+
+    result = {"code": api.COMMON_RESPONSE_CODE_LIST[code][0], "msg": msg, "data": data}
+    result.update(kwargs)
+    return json_return(result)
 
 
 @api.before_request
 def before_request():
     """蓝图请求前处理函数"""
-    for p in COMMON_PARAM_LIST:     # 验证公共参数
+    for p in api.COMMON_REQUEST_PARAM_LIST:     # 验证公共参数
         field_name = p.get("name")
         field_reg = p.get("reg")
         field_required = p.get("required")
         field_data = str(g.request_data.get(field_name, "")).strip()
         if field_required and re.search(field_reg, str(field_data)) is None:
-            current_app.logger.debug("公共参数错误：{0}:{1}".format(field_name, field_data))
+            current_app.logger.error("公共参数错误：{0}:{1}".format(field_name, field_data))
             return api_return("PARAM_ERROR", "公共参数错误：{0}".format(field_name))
         setattr(g, field_name, field_data)
     g.client_info = "-".join([str(g.get("app_channel", "")), str(g.get("os_type", "")), str(g.get("device_uuid", ""))])
 
 
-@api.before_app_first_request
-def register_api_doc():
-    """全局第一个请求之前，把接口文档路由添加到应用中"""
-    if current_app.config.get("ENV") == "development":
-        from ..doc import generate_doc
-        view_functions = [(k, v) for k, v in current_app.view_functions.items() if k.startswith(api.name+".")]
-        api_doc_func = partial(generate_doc, view_functions=view_functions, common_param_list=COMMON_PARAM_LIST, response_code_list=RESPONSE_CODE_LIST)
-        api_doc_endpoint = api.name + "_api_doc"
-        api_doc_url = api.url_prefix + "/doc/" if api.url_prefix else "/doc/"
-        current_app.add_url_rule(api_doc_url, view_func=api_doc_func, endpoint=api_doc_endpoint, methods=["GET"])
-        # 由于请求分发（full_dispatch_request）之前request的内容就已经通过request_context装载完毕，那时候url_map中还没有文档接口。
-        # 如果恰好第一个request就要请求文档接口，会导致request_context装载时match_request失败，产生404错误，然后调用请求分发时会弹出这个错误。
-        # 这里在匹配到请求文档接口的意图后，手动修改request请求体，把错误去除后再把url_rule装载到请求体里，就可以了。
-        if request.path == api_doc_url and request.method.upper() == "GET":
-            request.routing_exception = None
-            request.url_rule = current_app.url_map._rules_by_endpoint[api_doc_endpoint][0]
-            request.view_args = {}
-
-
 @api.errorhandler(TokenErr)
-def error_token(error):
-    current_app.logger.debug("Token错误：{0}, {1}".format(error.desc, str(error.kwargs)))
+def token_error(error):
+    current_app.logger.error("Token错误：{0}, {1}".format(error.desc, str(error.kwargs)))
     return api_return(error.name, error.desc)
 
 
 @api.errorhandler(Exception)
-def catch_error(error):
+def other_error(error):
+    if isinstance(error, HTTPException):
+        current_app.logger.error("Http错误：{0}, {1}".format(error.code, error.description))
+        return api_return(error.code)
     file, line, func, _ = get_error_info()
     current_app.logger.error('代码错误：{0}, {1}({2})[{3}]'.format(str(error), file, line, func))
     return api_return("ERR", "服务器内部异常")
@@ -105,5 +126,5 @@ def logout_user():
     clear_token(g.get("user_id", 0))
 
 
-# 导入蓝图要加载的接口文件
+# 导入蓝图要加载的接口
 from . import base

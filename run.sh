@@ -11,41 +11,41 @@ function get_pid(){
 function Status(){
     pid=`get_pid`
     if [ "X$pid" != "X" ];then
-        echo "uwsgi-${app} is running![$pid]"
+        echo "uwsgi-${app_name} is running![pid:$pid]"
     else
-        echo "uwsgi-${app} is not running!"
+        echo "uwsgi-${app_name} is not running!"
     fi
 }
 
 function Start(){
 	pid=`get_pid`
     if [ "X$pid" != "X" ];then
-        echo "uwsgi-${app} is running![$pid]"
+        echo "uwsgi-${app_name} is running![pid:$pid]"
         return
     else
-        ${UWSGI} --uid ${USER} -s ${host}:${port} --gevent 1000 -M -t 30 --pidfile ${pidfile} --chdir ${cur_dir} -w myapp:flask_app -d ${logfile} --logformat "${UWSGI_LOG_FORMAT}"
+        ${UWSGI} --uid ${USER} -s ${host}:${port} --gevent 1000 -M -t 30 --pidfile ${pidfile} --chdir ${cur_dir} --env "APP_ENV=${app_env}" --env "APP_NAME=${app_name}" -w app:flask_app -d ${logfile} --logformat "${UWSGI_LOG_FORMAT}"
     fi
     sleep 1
     pid=`get_pid`
     if [ "X$pid" = "X" ];then
-        echo "Start uwsgi-${app} failed"
+        echo "Start uwsgi-${app_name} failed"
         exit 1
     else
-        echo "Start uwsgi-${app} success![$pid]"
+        echo "Start uwsgi-${app_name} success![pid:$pid]"
     fi
 }
 
 function Stop(){
     pid=`get_pid`
     if [ "X$pid" = "X" ];then
-        echo "uwsgi-${app} is not running!"
+        echo "uwsgi-${app_name} is not running!"
     else
         ${UWSGI} --uid ${USER} --stop ${pidfile}
         if [ $? -ne 0 ];then
-            echo "Stop uwsgi-${app} failed![$pid]"
+            echo "Stop uwsgi-${app_name} failed![pid:$pid]"
             exit 1
         else
-            echo "Stop uwsgi-${app} success!"
+            echo "Stop uwsgi-${app_name} success!"
         fi
     fi
 }
@@ -53,19 +53,19 @@ function Stop(){
 function Reload(){
     pid=`get_pid`
     if [ "X$pid" = "X" ];then
-        echo "uwsgi-${app} is not running!"
+        echo "uwsgi-${app_name} is not running!"
         Start
     else
         ${UWSGI} --uid ${USER} --reload ${pidfile}
         if [ $? -ne 0 ];then
-            echo "Reload uwsgi-${app} failed![$pid]"
+            echo "Reload uwsgi-${app_name} failed![pid:$pid]"
             exit 1
         else
             pid=`get_pid`
             if [ "X$pid" != "X" ];then
-                echo "Reload uwsgi-${app} success![$pid]"
+                echo "Reload uwsgi-${app_name} success![pid:$pid]"
             else
-                echo "Reload uwsgi-${app} failed!"
+                echo "Reload uwsgi-${app_name} failed!"
                 exit 1
             fi
         fi
@@ -74,15 +74,19 @@ function Reload(){
 
 
 cur_dir="$(cd `dirname "$0"` && pwd)"
-UWSGI='/data/apps/py36_flask/bin/uwsgi'
-UWSGI_LOG_FORMAT='"%(ltime)" "%(addr)" "%(uagent)" "%(method) %(uri)" %(cl)B %(status) %(rsize)B %(msecs)ms'
-USER='uwsgi'
 
-app='web'
+USER='uwsgi'
+# id ${USER} >/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin ${USER}   # 用户不存在时创建
+# chown ${USER}. -R ${cur_dir}                  # 修改文件夹权限
+UWSGI='/data/apps/python312/bin/uwsgi'          # 需要替换为实际的路径
+UWSGI_LOG_FORMAT='"%(ltime)" "%(addr)" "%(uagent)" "%(method) %(uri)" %(cl)B %(status) %(rsize)B %(msecs)ms'
+
+app_env='prod'
+app_name='web'
 host='127.0.0.1'
 port='8890'
-pidfile="/var/run/uwsgi-${app}.pid"
-logfile="/var/log/uwsgi-${app}.log"
+pidfile="/var/run/uwsgi-${app_name}-${app_env}.pid"
+logfile="/var/log/uwsgi-${app_name}-${app_env}.log"
 
 if [ "${1,,}" = "status" ]; then
     Status

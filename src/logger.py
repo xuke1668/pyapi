@@ -31,7 +31,7 @@ class Logger(object):
         if self.log_dir.startswith("/"):
             log_path = os.path.normpath(self.log_dir)
         else:
-            log_path = os.path.normpath(os.path.join(app.root_path, '../', self.log_dir))
+            log_path = os.path.normpath(os.path.join(app.root_path, self.log_dir))
         if not os.path.isdir(log_path):
             try:
                 os.makedirs(log_path)
@@ -40,7 +40,7 @@ class Logger(object):
 
         formatter = Formatter('%(asctime)s|%(levelname)s|%(pathname)s(%(lineno)d)|%(funcName)s|%(message)s')
         log_file = os.path.join(log_path, app.name + '.log')
-        log_file_handler = handlers.TimedRotatingFileHandler(log_file, when="D", backupCount=self.log_keep_day)
+        log_file_handler = handlers.TimedRotatingFileHandler(f"{log_file}", when="D", backupCount=self.log_keep_day)
         log_file_handler.setFormatter(formatter)
         app.logger.addHandler(log_file_handler)
         app.logger.setLevel(int(self.log_level))

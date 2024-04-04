@@ -50,7 +50,7 @@ def send_push_by_jpush(app_name, platform, reg_id, content, out_id, **kwargs):
 
 def send_sms_by_alisms(app_name, phone_number, template_code, template_params, out_id):
     """
-    通过阿里云sms发送短信
+    通过sms服务发送短信
     :param app_name:        应用名称
     :param phone_number:     接收短信的手机号
     :param template_code:    短信模板ID
@@ -58,7 +58,7 @@ def send_sms_by_alisms(app_name, phone_number, template_code, template_params, o
     :param out_id:           业务流水号
     :return: bool:          返回成功或失败
     """
-    sms_server_url = current_app.config.get("ALISMS_SERVER_URL")
+    sms_server_url = current_app.config.get("SMS_SERVER_URL")
     if not sms_server_url:
         current_app.logger.error("未配置短信网关地址")
         return False
@@ -96,7 +96,7 @@ def upload_file_to_oss(bucket_name, file, file_name=None):
     endpoint = current_app.config.get("OSS_ACCESS_ENDPOINT")
     oss_access_key_id = current_app.config.get("OSS_ACCESS_KEY_ID")
     oss_access_key_secret = current_app.config.get("OSS_ACCESS_KEY_SECRET")
-    if endpoint is None or oss_access_key_id is None or oss_access_key_secret is None:
+    if not oss_access_key_id or not oss_access_key_secret or not endpoint:
         current_app.logger.error("OSS配置不正确")
         return False
 
