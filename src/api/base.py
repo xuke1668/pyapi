@@ -17,10 +17,7 @@ from ..model.base import AdminUser as UserInfo, VerifySMS
 from . import api, api_return, need_login, login_user, logout_user
 
 
-###################################################################
-# 注册接口
-###################################################################
-@api.route("/get_register_code/", methods=["POST"])
+@api.post("/get_register_code/")
 def get_register_code():
     """
     #group  基础
@@ -46,18 +43,17 @@ def get_register_code():
         current_app.logger.error("账号已存在: account:%s", account)
         return api_return("DATA_EXIST", "账号已存在")
 
-    app_name = current_app.config.get("APP_NAME", "")
     last_time = get_datetime(day=-1)
     sms_business = "register"
     code_limit = int(current_app.config.get("MAX_REGISTER_CODE_ONE_DAY", 5))
-    count = VerifySMS.query.filter_by(app_name=app_name, phone=account, business=sms_business)\
+    count = VerifySMS.query.filter_by(app_name=current_app.name, phone=account, business=sms_business)\
         .filter(VerifySMS.create_time > last_time).count()
     if count >= code_limit:
         current_app.logger.error("请求次数超出限制: account:%s, count:%s, code_limit:%s", account, count, code_limit)
         return api_return("REQUEST_NUMBER_LIMIT", "请求次数超出限制")
 
     code_interval = int(current_app.config.get("SMS_CODE_INTERVAL_TIME", 60))
-    last = VerifySMS.query.filter_by(app_name=app_name, phone=account, business=sms_business)\
+    last = VerifySMS.query.filter_by(app_name=current_app.name, phone=account, business=sms_business)\
         .order_by(VerifySMS.id.desc()).first()
     if last and (datetime.now() - last.create_time).total_seconds() < code_interval:
         current_app.logger.error("请求频率超出限制: account:%s", account)
@@ -65,12 +61,12 @@ def get_register_code():
 
     # 发送短信验证码
     code = create_random_num(6)
-    reset_code = VerifySMS(app_name=app_name, phone=account, business=sms_business, code=code)
+    reset_code = VerifySMS(app_name=current_app.name, phone=account, business=sms_business, code=code)
     if current_app.config.get("APP_ENV", "").lower() in ("development", "dev"):  # 测服直接把验证码从接口返回，不发短信
         res_data = {"code": code}
     else:
         business_id = create_uuid_str()
-        sms_res = send_sms_by_alisms(app_name, account, "SMS_118315037", {"code": code}, business_id)
+        sms_res = send_sms_by_alisms(current_app.name, account, "SMS_118315037", {"code": code}, business_id)
         if not sms_res:
             current_app.logger.error("短信发送失败: account:%s, code:%s", account, code)
             return api_return("SMS_SEND_FAILED", "短信发送失败，请稍后再试！")
@@ -87,21 +83,21 @@ def get_register_code():
         return api_return("FAILED", "获取失败")
 
 
-@api.route("/register/", methods=["POST"])
+@api.post("/register/")
 def register():
     """
     #group  基础
     #name   注册账号
     #desc   注册账号，注册后直接进入登录状态
     #param  account     <str>     账号
-    #param  password    <str>    新密码
+    #param  password    <str>    密码
     #param  code    <str>        验证码
     #return user_id  <int>   用户ID
     #return account <str>   用户账号
     #return nickname    <str>   用户昵称
     #return avatar_url  <str>   用户头像URL
     #return age <int>   用户年龄
-    #return sex <int>   用户性别
+    #return gender <int>   用户性别
     #return birthday    <str>   用户生日
     #return token   <str>   登录token
     #output_example
@@ -113,7 +109,7 @@ def register():
             "account": "15800881234",
             "nickname": "泰先生",
             "avatar_url": "",
-            "sex": 1,
+            "gender": 1,
             "birthday": "1990-09-09",
             "age": 27,
             "expiry_date": "2018-09-22",
@@ -140,9 +136,8 @@ def register():
         current_app.logger.error("账号已存在: account:%s", account)
         return api_return("DATA_EXIST", "账号已存在")
 
-    app_name = current_app.config.get("APP_NAME", "")
     sms_business = "register"
-    code = VerifySMS.query.filter_by(app_name=app_name, phone=account, business=sms_business, code=code, status=0).first()
+    code = VerifySMS.query.filter_by(app_name=current_app.name, phone=account, business=sms_business, code=code, status=0).first()
     if code is None:
         current_app.logger.error("验证码无效: account:%s, code:%s", account, code)
         return api_return("PARAM_CODE_ERROR", "验证码无效")
@@ -166,7 +161,7 @@ def register():
     # 格式化返回值
     login_info = {
         "user_id": user.id, "account": user.account, "nickname": user.nickname, "avatar_url": user.avatar_url,
-        "sex": user.sex, "birthday": user.birthday if user.birthday else "",
+        "gender": user.gender, "birthday": user.birthday if user.birthday else "",
         "age": user.age, "token": token
     }
 
@@ -174,10 +169,7 @@ def register():
     return api_return("OK", "注册成功", login_info)
 
 
-###################################################################
-# 登录接口
-###################################################################
-@api.route("/login/", methods=["POST"])
+@api.post("/login/")
 def login():
     """
     #group  基础
@@ -189,7 +181,7 @@ def login():
     #return account <str>   用户账号
     #return nickname    <str>   用户昵称
     #return avatar_url  <str>   用户头像URL
-    #return sex <int>   用户性别
+    #return gender <int>   用户性别
     #return birthday    <str>   用户生日
     #return age <int>   用户年龄
     #return token   <str>   登录token
@@ -202,7 +194,7 @@ def login():
             "account": "15800881234",
             "nickname": "泰先生",
             "avatar_url": "",
-            "sex": 1,
+            "gender": 1,
             "birthday": "1990-09-09",
             "age": 0,
             "token": "tXsfaN60"
@@ -242,7 +234,7 @@ def login():
     # 格式化返回值
     login_info = {
         "user_id": user.id, "account": user.account, "nickname": user.nickname, "avatar_url": user.avatar_url,
-        "sex": user.sex, "birthday": user.birthday if user.birthday else "",
+        "gender": user.gender, "birthday": user.birthday if user.birthday else "",
         "age": user.age, "token": token
     }
 
@@ -254,7 +246,7 @@ def login():
     return api_return("OK", "登录成功", login_info)
 
 
-@api.route("/logout/", methods=["POST"])
+@api.post("/logout/")
 @need_login
 def logout():
     """
@@ -274,10 +266,7 @@ def logout():
     return api_return("OK", "注销成功")
 
 
-###################################################################
-# 用户信息管理接口
-###################################################################
-@api.route("/get_user/", methods=["POST"])
+@api.post("/get_user/")
 @need_login
 def get_user():
     """
@@ -290,7 +279,7 @@ def get_user():
     #return nickname    <str>   用户昵称
     #return avatar_url  <str>   用户头像URL
     #return age <int>   用户年龄
-    #return sex <int>   用户性别
+    #return gender <int>   用户性别
     #return birthday    <str>   用户生日
     #return remark   <str>   备注
     #output_example
@@ -303,7 +292,7 @@ def get_user():
             "nickname": "小明",
             "avatar_url": "",
             "age": 27,
-            "sex": 1,
+            "gender": 1,
             "birthday": "1989-08-08",
             "remark": ""
         }
@@ -311,7 +300,7 @@ def get_user():
     """
 
     data = {"user_id": g.user.id, "account": g.user.account, "nickname": g.user.nickname, "avatar_url": g.user.avatar_url,
-            "sex": g.user.sex, "birthday": g.user.birthday if g.user.birthday else "", "age": g.user.age,
+            "gender": g.user.gender, "birthday": g.user.birthday if g.user.birthday else "", "age": g.user.age,
             "remark": g.user.remark}
 
     app_version = g.get("app_version")
@@ -331,7 +320,7 @@ def get_user():
     return api_return("OK", "查询成功", data)
 
 
-@api.route("/update_user/", methods=["POST"])
+@api.post("/update_user/")
 @need_login
 def update_user():
     """
@@ -340,7 +329,7 @@ def update_user():
     #desc   更新用户基本信息
     #priv   need_login
     #param  nickname    <str>   <可选>  昵称
-    #param  sex     <int>    <可选>  学员性别，1男，2女
+    #param  gender     <int>    <可选>  学员性别，1男，2女
     #param  birthday    <str>   <可选>  生日，1999-09-09
     #param  remark    <str>   <可选>  备注
     #output_example
@@ -351,7 +340,7 @@ def update_user():
     }
     """
     nickname = g.request_data.get("nickname")
-    sex = g.request_data.get("sex")
+    gender = g.request_data.get("gender")
     birthday = g.request_data.get("birthday")
     remark = g.request_data.get("remark")
 
@@ -362,11 +351,11 @@ def update_user():
             return api_return("PARAM_ERROR", "昵称长度不符，需要1-30个字符")
         g.user.nickname = nickname
 
-    if sex is not None:
-        if sex not in [1, 2]:
-            current_app.logger.error("性别参数错误: account:%s, sex:%s", g.user.account, sex)
+    if gender is not None:
+        if gender not in [1, 2]:
+            current_app.logger.error("性别参数错误: account:%s, gender:%s", g.user.account, gender)
             return api_return("PARAM_ERROR", "性别参数错误")
-        g.user.sex = sex
+        g.user.gender = gender
 
     if birthday is not None:
         birthday = str(birthday).strip()
@@ -392,7 +381,7 @@ def update_user():
         return api_return("FAILED", "修改失败")
 
 
-@api.route("/update_password/", methods=["POST"])
+@api.post("/update_password/")
 @need_login
 def update_password():
     """
@@ -435,7 +424,7 @@ def update_password():
         return api_return("FAILED", "修改失败")
 
 
-@api.route("/upload_avatar/", methods=["POST"])
+@api.post("/upload_avatar/")
 @need_login
 def upload_avatar():
     """
@@ -459,7 +448,7 @@ def upload_avatar():
         current_app.logger.error("头像文件错误: invalid avatar file, account:%s", g.user.account)
         return api_return("PARAM_ERROR", "头像文件错误")
 
-    bucket_name = current_app.config.get("OSS_AVATAR_BUCKET_NAME", "dev_avatar")
+    bucket_name = current_app.config.get("OSS_AVATAR_BUCKET_NAME", f"{current_app.name}_avatar")
     upload_url = upload_file_to_oss(bucket_name, avatar_file)
     if not upload_url:
         current_app.logger.error("头像文件存储失败: account:%s", g.user.account)
@@ -485,10 +474,7 @@ def upload_avatar():
         return api_return("FAILED", "上传失败")
 
 
-###################################################################
-# 重置密码接口
-###################################################################
-@api.route("/get_reset_password_code/", methods=["POST"])
+@api.post("/get_reset_password_code/")
 def get_reset_password_code():
     """
     #group  基础
@@ -518,18 +504,17 @@ def get_reset_password_code():
         current_app.logger.error("账号已禁用: account:%s, status:%s", account, user.status)
         return api_return("USER_INVALID", "账号已禁用")
 
-    app_name = current_app.config.get("APP_NAME", "")
     last_time = get_datetime(day=-1)
     sms_business = "reset_password"
     code_limit = int(current_app.config.get("MAX_RESET_CODE_ONE_DAY", 5))
-    count = VerifySMS.query.filter_by(app_name=app_name, phone=account, business=sms_business)\
+    count = VerifySMS.query.filter_by(app_name=current_app.name, phone=account, business=sms_business)\
         .filter(VerifySMS.create_time > last_time).count()
     if count >= code_limit:
         current_app.logger.error("请求次数超出限制: account:%s, count:%s, code_limit:%s", account, count, code_limit)
         return api_return("REQUEST_NUMBER_LIMIT", "请求次数超出限制")
 
     code_interval = int(current_app.config.get("SMS_CODE_INTERVAL_TIME", 60))
-    last = VerifySMS.query.filter_by(app_name=app_name, phone=account, business=sms_business)\
+    last = VerifySMS.query.filter_by(app_name=current_app.name, phone=account, business=sms_business)\
         .order_by(VerifySMS.id.desc()).first()
     if last and (datetime.now() - last.create_time).total_seconds() < code_interval:
         current_app.logger.error("请求频率超出限制: account:%s", account)
@@ -537,12 +522,12 @@ def get_reset_password_code():
 
     # 发送短信验证码
     code = create_random_num(6)
-    reset_code = VerifySMS(app_name=app_name, phone=account, business=sms_business, code=code)
+    reset_code = VerifySMS(app_name=current_app.name, phone=account, business=sms_business, code=code)
     if current_app.config.get("APP_ENV", "").lower() in ("development", "dev"):  # 测服直接把验证码从接口返回
         res_data = {"code": code}
     else:
         business_id = create_uuid_str()
-        sms_res = send_sms_by_alisms(app_name, account, "SMS_118315037", {"code": code}, business_id)
+        sms_res = send_sms_by_alisms(current_app.name, account, "SMS_118315037", {"code": code}, business_id)
         if not sms_res:
             current_app.logger.error("短信发送失败: account:%s, code:%s", account, code)
             return api_return("SMS_SEND_FAILED", "短信发送失败，请稍后再试！")
@@ -559,7 +544,7 @@ def get_reset_password_code():
         return api_return("FAILED", "获取失败")
 
 
-@api.route("/reset_password/", methods=["POST"])
+@api.post("/reset_password/")
 def reset_password():
     """
     #group  基础
@@ -574,7 +559,7 @@ def reset_password():
     #return nickname    <str>   用户昵称
     #return avatar_url  <str>   用户头像URL
     #return age <int>   用户年龄
-    #return sex <int>   用户性别
+    #return gender <int>   用户性别
     #return birthday    <str>   用户生日
     #return token   <str>   登录token
     #output_example
@@ -587,7 +572,7 @@ def reset_password():
             "nickname": "泰先生",
             "avatar_url": "",
             "age": 0,
-            "sex": 1,
+            "gender": 1,
             "birthday": "1990-09-09",
             "token": "tXsfaN60"
         }
@@ -615,9 +600,8 @@ def reset_password():
         current_app.logger.error("账号已禁用: account:%s, status:%s", account, user.status)
         return api_return("USER_INVALID", "账号已禁用")
 
-    app_name = current_app.config.get("APP_NAME", "")
     sms_business = "reset_password"
-    code = VerifySMS.query.filter_by(app_name=app_name, phone=account, business=sms_business, code=code, status=0).first()
+    code = VerifySMS.query.filter_by(app_name=current_app.name, phone=account, business=sms_business, code=code, status=0).first()
     if code is None:
         current_app.logger.error("验证码无效: account:%s, code:%s", account, code)
         return api_return("PARAM_CODE_ERROR", "验证码无效")
@@ -640,7 +624,7 @@ def reset_password():
     # 格式化返回值
     login_info = {
         "user_id": user.id, "account": user.account, "nickname": user.nickname, "avatar_url": user.avatar_url,
-        "sex": user.sex, "birthday": user.birthday if user.birthday else "",
+        "gender": user.gender, "birthday": user.birthday if user.birthday else "",
         "age": user.age, "token": token
     }
 
@@ -648,10 +632,7 @@ def reset_password():
     return api_return("OK", "重置成功", login_info)
 
 
-###################################################################
-# 更换账号接口
-###################################################################
-@api.route("/get_change_account_code/", methods=["POST"])
+@api.post("/get_change_account_code/")
 @need_login
 def get_change_account_code():
     """
@@ -686,18 +667,17 @@ def get_change_account_code():
         current_app.logger.error("账号已被使用: account:%s, new_account:%s", g.user.account, new_account)
         return api_return("PARAM_ERROR", "账号已被使用")
 
-    app_name = current_app.config.get("APP_NAME", "")
     last_time = get_datetime(day=-1)
     sms_business = "change_account"
     code_limit = int(current_app.config.get("MAX_CHANGE_ACCOUNT_CODE_ONE_DAY", 1))
-    count = VerifySMS.query.filter_by(app_name=app_name, phone=new_account, business=sms_business)\
+    count = VerifySMS.query.filter_by(app_name=current_app.name, phone=new_account, business=sms_business)\
         .filter(VerifySMS.create_time > last_time).count()
     if count >= code_limit:
         current_app.logger.error("请求次数超出限制: account:%s, new_account:%s, count:%s, code_limit:%s", g.user.account, new_account, count, code_limit)
         return api_return("REQUEST_NUMBER_LIMIT", "请求次数超出限制")
 
     code_interval = int(current_app.config.get("SMS_CODE_INTERVAL_TIME", 60))
-    last = VerifySMS.query.filter_by(app_name=app_name, phone=new_account, business=sms_business)\
+    last = VerifySMS.query.filter_by(app_name=current_app.name, phone=new_account, business=sms_business)\
         .order_by(VerifySMS.id.desc()).first()
     if last and (datetime.now() - last.create_time).total_seconds() < code_interval:
         current_app.logger.error("请求频率超出限制: account:%s, new_account:%s", g.user.account, new_account)
@@ -705,12 +685,12 @@ def get_change_account_code():
 
     # 发送短信验证码
     code = create_random_num(6)
-    reset_code = VerifySMS(app_name=app_name, phone=new_account, business=sms_business, code=code)
+    reset_code = VerifySMS(app_name=current_app.name, phone=new_account, business=sms_business, code=code)
     if current_app.config.get("APP_ENV", "").lower() in ("development", "dev"):  # 测服直接把验证码从接口返回
         res_data = {"code": code}
     else:
         business_id = create_uuid_str()
-        sms_res = send_sms_by_alisms(app_name, new_account, "SMS_118315037", {"code": code}, business_id)
+        sms_res = send_sms_by_alisms(current_app.name, new_account, "SMS_118315037", {"code": code}, business_id)
         if not sms_res:
             current_app.logger.error("短信发送失败: account:%s, new_account:%s, code:%s", g.user.account, new_account, code)
             return api_return("SMS_SEND_FAILED", "短信发送失败，请稍后再试！")
@@ -727,7 +707,7 @@ def get_change_account_code():
         return api_return("FAILED", "获取失败")
 
 
-@api.route("/change_account/", methods=["POST"])
+@api.post("/change_account/")
 @need_login
 def change_account():
     """
@@ -760,9 +740,8 @@ def change_account():
         current_app.logger.error("账号已被使用: account:%s, new_account:%s", g.user.account, new_account)
         return api_return("PARAM_ERROR", "账号已被使用")
 
-    app_name = current_app.config.get("APP_NAME", "")
     sms_business = "change_account"
-    code = VerifySMS.query.filter_by(app_name=app_name, phone=new_account, business=sms_business, code=code, status=0).first()
+    code = VerifySMS.query.filter_by(app_name=current_app.name, phone=new_account, business=sms_business, code=code, status=0).first()
     if code is None:
         current_app.logger.error("验证码无效: account:%s, new_account:%s, code:%s", g.user.account, new_account, code)
         return api_return("PARAM_CODE_ERROR", "验证码无效")

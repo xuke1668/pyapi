@@ -21,7 +21,7 @@ class AdminUser(db.Model):
     _password = db.Column("password", db.String(256), nullable=False, server_default="", comment="登录密码")
     nickname = db.Column(db.String(32), nullable=False, server_default="", comment="昵称")
     avatar_url = db.Column(db.String(256), nullable=False, server_default="", comment="头像URL")
-    sex = db.Column(db.SmallInteger, nullable=False, server_default="0", comment="性别，0未知，1男性，2女性")
+    gender = db.Column(db.SmallInteger, nullable=False, server_default="0", comment="性别，0未知，1男性，2女性")
     birthday = db.Column(db.Date, comment="生日")
     app_channel = db.Column(db.String(32), nullable=False, server_default="", comment="APP渠道")
     app_version = db.Column(db.String(32), nullable=False, server_default="", comment="APP版本")

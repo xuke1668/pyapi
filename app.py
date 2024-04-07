@@ -3,6 +3,8 @@
 from os import getenv
 from click import argument
 
+from sqlalchemy import text
+
 from src import create_app, db
 
 
@@ -24,16 +26,16 @@ def drop_db():
     """删除所有库表结构"""
     rv = input(f"确定要删除【{env}】环境下所有数据吗？[Y/N]\n")
     if rv and rv.lower() in ('y', 'yes'):
-        print('删除所有数据...', end="")
+        print("删除所有数据...", end="")
         db.drop_all()
-        print('完成')
+        print("完成")
 
 
 @flask_app.cli.command("rebuild_table")
-@argument('table_name')
+@argument("table_name")
 def rebuild_table(table_name):
-    print("drop table {0}".format(table_name))
-    db.session.execute("drop table IF EXISTS {0}".format(table_name))
+    print(f"drop table {table_name}")
+    db.session.execute(text(f"drop table IF EXISTS {table_name}"))
     print("create all")
     db.create_all()
     print("完成")

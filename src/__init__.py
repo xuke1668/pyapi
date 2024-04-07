@@ -96,5 +96,5 @@ def create_app(env="dev", name="app"):
     # 启动前检测
     check_app(app)
 
-    app.logger.info("application started on %s, found %s api.", env, len(list(app.url_map.iter_rules())) - 1)
+    app.logger.info(f"{app.name} started on {env}, found {len(list(app.url_map.iter_rules())) - 1} api.")
     return app

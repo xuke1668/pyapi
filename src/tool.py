@@ -201,13 +201,13 @@ def get_age(born, today=None):
         return today.year - born.year
 
 
-def get_max_hr(sex, age):
+def get_max_hr(gender, age):
     """计算最大心率"""
-    if not sex or re.search(r"^\d$", str(sex)) is None:
-        sex = 1
+    if not gender or re.search(r"^\d$", str(gender)) is None:
+        gender = 1
     if not age or re.search(r"^\d+$", str(age)) is None:
         age = 25
-    if int(sex) == 1:
+    if int(gender) == 1:
         max_hr = 220
     else:
         max_hr = 224
