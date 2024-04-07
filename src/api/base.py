@@ -277,9 +277,9 @@ def logout():
 ###################################################################
 # 用户信息管理接口
 ###################################################################
-@api.route("/get_user_info/", methods=["POST"])
+@api.route("/get_user/", methods=["POST"])
 @need_login
-def get_user_info():
+def get_user():
     """
     #group  基础
     #name   查询用户

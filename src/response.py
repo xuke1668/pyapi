@@ -12,7 +12,12 @@ from datetime import date, time, datetime
 from flask import Response
 
 
-GLOBAL_REQUEST_PARAM_LIST = {}
+GLOBAL_REQUEST_PARAM_LIST = {
+    "app_channel": {"type": "str", "desc": "APP渠道", "reg": r"\w+", "required": True},
+    "app_version": {"type": "str", "desc": "APP版本", "reg": r"\w+", "required": False},
+    "os_type": {"type": "str", "desc": "系统类型", "reg": r"\w+", "required": False},
+    "os_version": {"type": "str", "desc": "系统版本", "reg": r"\w+", "required": False},
+}
 GLOBAL_RESPONSE_CODE_LIST = {
     "200": (0, "成功"),
     "400": (400, "请求异常"),

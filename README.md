@@ -5,18 +5,18 @@ pyapi是一个基于Flask框架的api项目脚手架，是从实际应用中精�
 ## 简要说明
 #### 使用蓝图结构
     src/api是蓝图包目录，如果有多个模块，可以创建多个。
-    src/api/__init__是关于蓝图的特殊配置，如果多个蓝图有共同逻辑，也可以提取到src下的__init__中。
+    src/api/__init__是关于蓝图的特殊配置，如果多个蓝图有共同逻辑，也可以提取到src下的__init__中以app形式注册挂载。
 
 #### 统一认证身份
-    src/auth.py有用来验证token的装饰器函数。
+    src/auth.py有用来生成和清除token的方法，以及验证token的装饰器函数。
 
 #### 统一处理返回值
-    src/response.py有用来做接口返回数据json化处理的函数，以及全局定义的返回值列表。
+    src/response.py有用来做接口返回数据json化处理的函数，以及全局定义的参数及返回值列表。
 
 #### 功能插件
     src/logger.py是提供程序日志功能的插件，其实主要用来配置日志参数。
     src/cache.py是缓存插件，有基于内存的MemCache简单缓存和基于Redis的RedisCache缓存。
-    src/doc.py是生成接口文档的插件，根据注册在Flask中视图函数的注释自动生成接口文档，并注册为/doc/页面。
+    src/doc.py是生成接口文档的插件，根据注册在Flask中视图函数的注释自动生成接口文档，并注册为/doc/页面，可以按需要指定生成接口文档的蓝图。
 
 #### 配置文件
     src/config.py用来配置应用的参数。
@@ -55,3 +55,6 @@ pyapi是一个基于Flask框架的api项目脚手架，是从实际应用中精�
 - [Flask中文文档](https://dormousehole.readthedocs.io/en/latest/)
 - [uWSGI中文文档](https://uwsgi-docs-zh.readthedocs.io/zh_CN/latest/index.html)
 
+
+## 买杯咖啡支持一下
+<img src="./pay4coffee.png" width="400" height="200" alt="买杯咖啡支持一下" align=center />

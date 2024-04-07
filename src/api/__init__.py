@@ -5,9 +5,10 @@
 
 """
 import re
+from copy import deepcopy
 from functools import wraps
 
-from flask import Blueprint, current_app, g
+from flask import Blueprint, current_app, g, request
 from werkzeug.exceptions import HTTPException
 
 from ..response import json_return, GLOBAL_REQUEST_PARAM_LIST, GLOBAL_RESPONSE_CODE_LIST
@@ -19,17 +20,17 @@ from ..model.base import AdminUser as UserInfo
 api = Blueprint("api", __name__, url_prefix="/api")
 
 # 公共参数列表
-api.COMMON_REQUEST_PARAM_LIST = GLOBAL_REQUEST_PARAM_LIST
-api.COMMON_REQUEST_PARAM_LIST.update({
-        "app_channel": {"type": "str", "desc": "APP渠道", "reg": r"\w+", "required": True},
-        "app_version": {"type": "str", "desc": "APP版本", "reg": r"\w+", "required": False},
-        "os_type": {"type": "str", "desc": "系统类型", "reg": r"\w+", "required": False},
-        "os_version": {"type": "str", "desc": "系统版本", "reg": r"\w+", "required": False},
-        "device_uuid": {"type": "str", "desc": "设备唯一标识", "reg": r"\w+", "required": False},
+COMMON_REQUEST_PARAM_LIST = deepcopy(GLOBAL_REQUEST_PARAM_LIST)
+COMMON_REQUEST_PARAM_LIST.update({
+    "os_type": {"type": "str", "desc": "系统类型", "reg": r"\w+", "required": True},
+    "device_uuid": {"type": "str", "desc": "设备唯一标识", "reg": r"\w+", "required": True},
 })
+api.COMMON_REQUEST_PARAM_LIST = COMMON_REQUEST_PARAM_LIST
+
 # 公共返回值列表
-api.COMMON_RESPONSE_CODE_LIST = GLOBAL_RESPONSE_CODE_LIST
-api.COMMON_RESPONSE_CODE_LIST.update({
+COMMON_RESPONSE_CODE_LIST = deepcopy(GLOBAL_RESPONSE_CODE_LIST)
+COMMON_RESPONSE_CODE_LIST.update({
+    "ERR": (-1, "未知错误"),
     "TOKEN_NOT_FOUND": (2100, "缺少登录凭证"),
     "TOKEN_ERROR": (2101, "非法的登录凭证"),
     "TOKEN_INVALID": (2102, "登录凭证已失效"),
@@ -48,18 +49,20 @@ api.COMMON_RESPONSE_CODE_LIST.update({
     "USER_PRIV_ERROR": (2205, "用户权限不足"),
     "USER_EXIST": (2206, "用户已存在"),
 })
+api.COMMON_RESPONSE_CODE_LIST = COMMON_RESPONSE_CODE_LIST
 
 
 def api_return(code, msg=None, data=None, **kwargs):
     code = str(code).upper()
-    if code not in api.COMMON_RESPONSE_CODE_LIST.keys():
+    response_codes = getattr(current_app.blueprints.get(request.blueprint, current_app), "COMMON_RESPONSE_CODE_LIST", COMMON_RESPONSE_CODE_LIST)
+    if code not in response_codes.keys():
         code = "ERR"
     if msg is None:
-        msg = api.COMMON_RESPONSE_CODE_LIST[code][1]
+        msg = response_codes[code][1]
     if data is None:
         data = ""
 
-    result = {"code": api.COMMON_RESPONSE_CODE_LIST[code][0], "msg": msg, "data": data}
+    result = {"code": response_codes[code][0], "msg": msg, "data": data}
     result.update(kwargs)
     return json_return(result)
 
@@ -67,26 +70,25 @@ def api_return(code, msg=None, data=None, **kwargs):
 @api.before_request
 def before_request():
     """蓝图请求前处理函数"""
-    for p in api.COMMON_REQUEST_PARAM_LIST:     # 验证公共参数
-        field_name = p.get("name")
+    for field_name, p in getattr(current_app.blueprints.get(request.blueprint, current_app), "COMMON_REQUEST_PARAM_LIST", dict()).items():     # 验证公共参数
         field_reg = p.get("reg")
         field_required = p.get("required")
         field_data = str(g.request_data.get(field_name, "")).strip()
         if field_required and re.search(field_reg, str(field_data)) is None:
-            current_app.logger.error("公共参数错误：{0}:{1}".format(field_name, field_data))
-            return api_return("PARAM_ERROR", "公共参数错误：{0}".format(field_name))
+            current_app.logger.error(f"公共参数错误：{field_name}:{field_data}")
+            return api_return("PARAM_ERROR", f"公共参数错误：{field_name}")
         setattr(g, field_name, field_data)
-    g.client_info = "-".join([str(g.get("app_channel", "")), str(g.get("os_type", "")), str(g.get("device_uuid", ""))])
+    g.client_info = f"{g.get('app_channel', '')}-{g.get('os_type', '')}-{g.get('device_uuid', '')}"
 
 
 @api.errorhandler(TokenErr)
-def token_error(error):
+def token_error_handler(error):
     current_app.logger.error("Token错误：{0}, {1}".format(error.desc, str(error.kwargs)))
     return api_return(error.name, error.desc)
 
 
 @api.errorhandler(Exception)
-def other_error(error):
+def other_error_handler(error):
     if isinstance(error, HTTPException):
         current_app.logger.error("Http错误：{0}, {1}".format(error.code, error.description))
         return api_return(error.code)
@@ -102,7 +104,7 @@ def need_login(func):
     def wrapper(*args, **kwargs):
         user_id = g.get("user_id")
         if not user_id:
-            raise TokenErr("TOKEN_USER_ERROR", "无效的用户")
+            raise TokenErr("TOKEN_USER_ERROR", "无效的用户ID")
 
         user = UserInfo.query.filter_by(id=user_id).first()
         if user is None:

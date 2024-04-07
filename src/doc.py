@@ -268,30 +268,31 @@ PAGE_HTML = """
 
 
 class ApiDoc(object):
-    def __init__(self, app=None, api_blueprints=None, api_doc_url="/doc/"):
+    def __init__(self, app=None, blueprint_names=None, api_doc_url="/doc/"):
+        """blueprint_names指定生成的蓝图名称列表，不指定时生成所有flask app下注册的接口"""
         self.api_doc_endpoint = "api_doc"
         self.api_doc_url = api_doc_url
         self.html = PAGE_HTML
         self.app = app
         if app is not None:
-            self.init_app(app, api_blueprints)
+            self.init_app(app, blueprint_names)
 
-    def init_app(self, app, api_blueprints):
-        api_data = self.collect_api(api_blueprints)
+    def init_app(self, app, blueprint_names):
+        api_data = self.collect_api(blueprint_names)
         api_doc_func = partial(self.generate_doc, api_data=api_data)
         api_doc_endpoint = app.name + "_" + self.api_doc_endpoint
         app.add_url_rule(self.api_doc_url, view_func=api_doc_func, endpoint=api_doc_endpoint, methods=["GET"])
 
-    def collect_api(self, api_blueprints):
+    def collect_api(self, blueprint_names):
         api_data = dict()
-        for bp_name in api_blueprints:
-            blueprint = self.app.blueprints.get(bp_name)
-            if not blueprint:
+        api_mod = [self.app.blueprints.get(bp_name) for bp_name in blueprint_names] if blueprint_names else [self.app]
+        for mod in api_mod:
+            if not mod:
                 continue
-            common_request_param_list = getattr(blueprint, "COMMON_REQUEST_PARAM_LIST", dict())
-            common_response_code_list = getattr(blueprint, "COMMON_RESPONSE_CODE_LIST", dict())
-            view_functions = [(k, v) for k, v in self.app.view_functions.items() if k.startswith(bp_name + ".")]
-            api_data[bp_name] = {
+            common_request_param_list = getattr(mod, "COMMON_REQUEST_PARAM_LIST", dict())
+            common_response_code_list = getattr(mod, "COMMON_RESPONSE_CODE_LIST", dict())
+            view_functions = [(k, v) for k, v in self.app.view_functions.items() if blueprint_names is None or k.startswith(mod.name + ".")]
+            api_data[mod.name] = {
                 "view_functions": view_functions,
                 "common_request_param_list": common_request_param_list,
                 "common_response_code_list": common_response_code_list
@@ -316,12 +317,12 @@ class ApiDoc(object):
         em = re.compile(r"([a-zA-Z0-9_\[\]]+\.)")  # 多级字段匹配
 
         api_count = 0
-        for bp, data in api_data.items():
-            if bp == "static":
-                continue
-
+        for data in api_data.values():
             api_doc_data = {}
             for endpoint, func in data.get("view_functions", []):
+                if endpoint == "static":
+                    continue
+
                 doc = func.__doc__ or ""
                 if re_ignore.findall(doc):
                     continue

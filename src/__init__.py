@@ -16,7 +16,6 @@ from werkzeug.utils import import_string
 from .config import config
 from .logger import Logger
 from .cache import Cache
-from .doc import ApiDoc
 
 db = SQLAlchemy()
 logger = Logger()
@@ -91,7 +90,8 @@ def create_app(env="dev", name="app"):
 
     # 生成api文档
     if app.config.get("APP_API_DOC"):
-        ApiDoc(app, api_blueprints=["api"])     # 指定要生成接口文档的蓝图name
+        from .doc import ApiDoc
+        ApiDoc(app, blueprint_names=["api"])     # 不指定blueprint_names则生成flask app下所有view_functions
 
     # 启动前检测
     check_app(app)

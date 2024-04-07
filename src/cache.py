@@ -50,16 +50,16 @@ class MemCache(SimpleCache):
     """内存缓存"""
     def __init__(self, app=None, key_prefix="", key_timeout=None, threshold=1000):
         super().__init__(threshold)
-        self.key_prefix = ""
-        self.key_timeout = 0
+        self.key_prefix = key_prefix+"_" if key_prefix else ""
+        self.key_timeout = key_timeout if key_timeout else 0
         self.app = app
         if app is not None:
             self.init_app(app, key_prefix, key_timeout, threshold)
 
     def init_app(self, app, key_prefix="", key_timeout=None, threshold=1000):
         self._threshold = threshold
-        self.key_prefix = key_prefix if key_prefix else app.config.get("MEM_CACHE_KEY_PREFIX", self.key_prefix)
-        self.key_timeout = key_timeout if key_timeout else app.config.get("MEM_CACHE_KEY_TIMEOUT", self.key_timeout)
+        self.key_prefix = f"{app.name}_{key_prefix+"_" if key_prefix else self.key_prefix}"
+        self.key_timeout = key_timeout if key_timeout else self.key_timeout
 
     def _normalize_timeout(self, timeout):
         if timeout is None:
@@ -113,16 +113,16 @@ class RedisCache:
     def __init__(self, app=None, redis_uri="", key_prefix="", key_timeout=None, **kwargs):
         self.redis_uri = 'redis://localhost:6379/0'
         self._client = None
-        self.key_prefix = ""
-        self.key_timeout = -1
+        self.key_prefix = key_prefix+"_" if key_prefix else ""
+        self.key_timeout = key_timeout if key_timeout else -1
         self.app = app
         if app is not None:
             self.init_app(app, redis_uri, key_prefix, key_timeout, **kwargs)
 
     def init_app(self, app, redis_uri="", key_prefix="", key_timeout=None, **kwargs):
         self.redis_uri = redis_uri if redis_uri else app.config.get("REDIS_URI", self.redis_uri)
-        self.key_prefix = key_prefix if key_prefix else app.name + "_"
-        self.key_timeout = key_timeout if key_timeout else app.config.get("REDIS_KEY_TIMEOUT", self.key_timeout)
+        self.key_prefix = f"{app.name}_{key_prefix+"_" if key_prefix else self.key_prefix}"
+        self.key_timeout = key_timeout if key_timeout else self.key_timeout
 
         try:
             import redis
